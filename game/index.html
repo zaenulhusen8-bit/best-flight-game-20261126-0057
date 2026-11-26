@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="data:,">
+<title>Ridge Runner — Meridian Valley</title>
+<style>
+  html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: #0b1e33; }
+  #scene { position: fixed; inset: 0; display: block; }
+  #hud { position: fixed; inset: 0; pointer-events: none; font-family: "Segoe UI", Verdana, sans-serif; color: #eaf6ff; }
+  .panel { position: absolute; background: rgba(6, 24, 40, 0.62); border: 1px solid rgba(140, 220, 255, 0.35);
+           border-radius: 10px; padding: 8px 12px; text-shadow: 0 1px 2px rgba(0,0,0,0.8); }
+  #readouts { top: 12px; left: 12px; min-width: 210px; }
+  #readouts .big { font-size: 26px; font-weight: 700; letter-spacing: 0.5px; line-height: 1.15; }
+  #readouts .lbl { font-size: 11px; color: #9fd8ff; letter-spacing: 2px; }
+  #readouts .row { display: flex; justify-content: space-between; gap: 14px; }
+  #mission { top: 12px; right: 12px; text-align: right; min-width: 230px; }
+  #mission .title { font-size: 15px; font-weight: 700; color: #ffe9a8; letter-spacing: 1px; }
+  #mission .goal { font-size: 13px; margin-top: 2px; }
+  #mission .timer { font-size: 22px; font-weight: 700; margin-top: 2px; }
+  #bars { bottom: 12px; left: 12px; width: 230px; }
+  .barlabel { font-size: 11px; letter-spacing: 2px; color: #9fd8ff; display: flex; justify-content: space-between; }
+  .bar { height: 10px; border-radius: 5px; background: rgba(255,255,255,0.14); margin: 3px 0 8px; overflow: hidden; }
+  .bar > div { height: 100%; border-radius: 5px; }
+  #fuelFill { background: linear-gradient(90deg, #37d67a, #a8f0c0); width: 100%; }
+  #dmgFill { background: linear-gradient(90deg, #ffb347, #ff5f45); width: 0%; }
+  #instruments { position: absolute; bottom: 12px; left: 50%; transform: translateX(-50%); }
+  #instruments canvas { display: block; border-radius: 12px; border: 1px solid rgba(140,220,255,0.35);
+                        background: rgba(6, 24, 40, 0.55); }
+  #message { position: absolute; top: 22%; left: 50%; transform: translateX(-50%); text-align: center;
+             font-size: 30px; font-weight: 800; letter-spacing: 1px; color: #fff;
+             text-shadow: 0 2px 10px rgba(0,0,0,0.9); white-space: nowrap; }
+  #submessage { position: absolute; top: calc(22% + 42px); left: 50%; transform: translateX(-50%);
+                text-align: center; font-size: 16px; color: #cfeeff; text-shadow: 0 1px 6px rgba(0,0,0,0.9); }
+  #help { bottom: 12px; right: 12px; font-size: 11.5px; line-height: 1.55; color: #bfe6ff; text-align: right; }
+  #title { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center;
+           background: radial-gradient(ellipse at 50% 35%, rgba(10,40,70,0.25), rgba(3,10,20,0.78));
+           pointer-events: auto; }
+  #title .card { max-width: 640px; margin: 0 20px; background: rgba(5, 22, 38, 0.88); border: 1px solid rgba(140,220,255,0.4);
+                 border-radius: 16px; padding: 28px 34px; color: #eaf6ff; box-shadow: 0 12px 60px rgba(0,0,0,0.6); }
+  #title h1 { margin: 0 0 4px; font-size: 40px; letter-spacing: 3px; color: #ffd97a; }
+  #title h2 { margin: 0 0 14px; font-size: 15px; font-weight: 400; color: #9fd8ff; letter-spacing: 1px; }
+  #title p { font-size: 14px; line-height: 1.55; margin: 8px 0; }
+  #title .missions { display: flex; gap: 10px; margin: 16px 0 6px; }
+  #title .mission { flex: 1; border: 1px solid rgba(140,220,255,0.45); border-radius: 10px; padding: 10px 12px;
+                    cursor: pointer; background: rgba(20, 60, 95, 0.5); }
+  #title .mission:hover { background: rgba(40, 100, 150, 0.65); border-color: #ffd97a; }
+  #title .mission b { display: block; font-size: 14px; color: #ffe9a8; margin-bottom: 3px; }
+  #title .mission span { font-size: 12px; line-height: 1.4; color: #cfeeff; }
+  #title .keys { font-size: 12px; color: #9fd8ff; margin-top: 12px; line-height: 1.7; }
+  #vignette { position: fixed; inset: 0; pointer-events: none;
+              background: radial-gradient(ellipse at center, transparent 62%, rgba(0,0,10,0.35) 100%); }
+</style>
+</head>
+<body>
+<canvas id="scene"></canvas>
+<div id="hud">
+  <div id="readouts" class="panel">
+    <div class="row"><span class="lbl">ALTITUDE</span><span class="big" id="alt">0 m</span></div>
+    <div class="row"><span class="lbl">AIRSPEED</span><span class="big" id="spd">0 kt</span></div>
+    <div class="row"><span class="lbl">HEADING</span><span class="big" id="hdg">000°</span></div>
+    <div class="row"><span class="lbl">THROTTLE</span><span class="big" id="thr">0%</span></div>
+  </div>
+  <div id="mission" class="panel">
+    <div class="title" id="missionTitle">RING RUN</div>
+    <div class="goal" id="missionGoal">Fly through the glowing rings in order.</div>
+    <div class="timer" id="missionTimer"></div>
+    <div class="goal" id="missionProgress">Rings 0 / 8</div>
+  </div>
+  <div id="bars" class="panel">
+    <div class="barlabel"><span>FUEL</span><span id="fuelPct">100%</span></div>
+    <div class="bar"><div id="fuelFill"></div></div>
+    <div class="barlabel"><span>AIRFRAME</span><span id="dmgPct">0% damage</span></div>
+    <div class="bar"><div id="dmgFill"></div></div>
+  </div>
+  <div id="instruments"><canvas id="panel" width="460" height="120"></canvas></div>
+  <div id="message"></div>
+  <div id="submessage"></div>
+  <div id="help" class="panel">W/S pitch &nbsp; A/D bank &nbsp; SHIFT throttle up<br>CTRL throttle down &nbsp; MOUSE steer &nbsp; C camera<br>1/2/3 mission &nbsp; O autopilot &nbsp; P pause &nbsp; R restart</div>
+</div>
+<div id="vignette"></div>
+<div id="title">
+  <div class="card">
+    <h1>RIDGE RUNNER</h1>
+    <h2>MERIDIAN VALLEY &middot; a flight game by the Meridian Valley Flying Club</h2>
+    <p>Fly the little skylark <b>&ldquo;Kestrel&rdquo;</b> over Meridian Valley — a river valley ringed by
+    snow-capped ridges, with one grass airfield at its heart. Mind your fuel, mind the ridges:
+    every scrape costs airframe, and an empty tank means a glider.</p>
+    <p>Pick a mission. Rings pay for clean flying; landings pay for soft hands; the clock pays for nerve.</p>
+    <div class="missions">
+      <div class="mission" data-mission="rings"><b>1 &middot; RING RUN</b><span>Thread 8 glowing rings over the valley. Fuel is tight — fly smooth.</span></div>
+      <div class="mission" data-mission="landing"><b>2 &middot; RUNWAY LANDING</b><span>Take off, fly the circuit, and put her down gently on runway 09.</span></div>
+      <div class="mission" data-mission="trial"><b>3 &middot; RIDGE TIME TRIAL</b><span>10 rings against the clock. Fastest clean run wins the day.</span></div>
+    </div>
+    <div class="keys">W/S pitch &middot; A/D bank &middot; SHIFT / CTRL throttle &middot; mouse steers &middot; C camera &middot; O autopilot demo &middot; P pause &middot; R restart<br>
+    Sound on: the engine hums, the wind rises with speed, rings chime.</div>
+  </div>
+</div>
+<script src="vendor/three.min.js"></script>
+<script type="module" src="src/main.js"></script>
+</body>
+</html>
